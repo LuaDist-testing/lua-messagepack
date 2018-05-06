@@ -1,7 +1,9 @@
 lua-MessagePack : a pure Lua implementation (spec v5)
 =====================================================
 
-[![Build Status](https://travis-ci.org/fperrad/lua-MessagePack.png)](https://travis-ci.org/fperrad/lua-MessagePack)
+[![Build Status](https://travis-ci.org/fperrad/lua-MessagePack.png?branch=master)](https://travis-ci.org/fperrad/lua-MessagePack)
+[![Coverage Status](https://coveralls.io/repos/fperrad/lua-MessagePack/badge.png?branch=master)](https://coveralls.io/r/fperrad/lua-MessagePack?branch=master)
+[![Licence](http://img.shields.io/badge/Licence-MIT-brightgreen.svg)](COPYRIGHT)
 
 Introduction
 ------------
@@ -23,7 +25,7 @@ and the sources are hosted at [http://github.com/fperrad/lua-MessagePack/](http:
 Copyright and License
 ---------------------
 
-Copyright (c) 2012-2014 Francois Perrad
+Copyright (c) 2012-2015 Francois Perrad
 
 This library is licensed under the terms of the MIT/X11 license, like Lua itself.
 

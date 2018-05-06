@@ -4,9 +4,12 @@ MANIFEST
 Makefile
 README.md
 doc/Makefile
+doc/doc.css
 doc/index.html
 doc/msgpack.html
+msgpack.org.md
 rockspec.in
+rockspec.lua53.in
 src/MessagePack.lua
 src5.3/MessagePack.lua
 test/00-require.t
@@ -19,3 +22,4 @@ test/12-metatable.t
 test/13-coat.t
 test/14-function.t
 test/15-ffi-cdata.t
+test/issue6.t

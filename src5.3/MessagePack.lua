@@ -2,11 +2,6 @@
 -- lua-MessagePack : <http://fperrad.github.com/lua-MessagePack/>
 --
 
-local SIZEOF_NUMBER = debug.numbits'f' / 8
-local luac = string.dump(load "a = 1")
-local header = { luac:sub(1, 12):byte(1, 12) }
-local NUMBER_INTEGRAL = 1 == header[12]
-
 local assert = assert
 local error = error
 local pairs = pairs
@@ -16,14 +11,10 @@ local tostring = tostring
 local type = type
 local char = require'string'.char
 local math_type = require'math'.type
-local frexp = require'math'.frexp
-local ldexp = require'math'.ldexp
-local huge = require'math'.huge
+local tointeger = require'math'.tointeger
 local tconcat = require'table'.concat
-local packfloat = require'string'.packfloat
-local packint = require'string'.packint
-local unpackfloat = require'string'.unpackfloat
-local unpackint = require 'string'.unpackint
+local pack = require'string'.pack
+local unpack = require'string'.unpack
 
 --[[ debug only
 local format = require'string'.format
@@ -77,10 +68,10 @@ packers['string_compat'] = function (buffer, str)
         buffer[#buffer+1] = char(0xA0 + n)      -- fixstr
     elseif n <= 0xFFFF then
         buffer[#buffer+1] = char(0xDA)          -- str16
-        buffer[#buffer+1] = packint(n, 2, 'b')
-    elseif n <= 0xFFFFFFFF then
+        buffer[#buffer+1] = pack('>I2', n)
+    elseif n <= 0xFFFFFFFF.0 then
         buffer[#buffer+1] = char(0xDB)          -- str32
-        buffer[#buffer+1] = packint(n, 4, 'b')
+        buffer[#buffer+1] = pack('>I4', n)
     else
         error"overflow in pack 'string_compat'"
     end
@@ -96,10 +87,10 @@ packers['_string'] = function (buffer, str)
                                  n)
     elseif n <= 0xFFFF then
         buffer[#buffer+1] = char(0xDA)          -- str16
-        buffer[#buffer+1] = packint(n, 2, 'b')
-    elseif n <= 0xFFFFFFFF then
+        buffer[#buffer+1] = pack('>I2', n)
+    elseif n <= 0xFFFFFFFF.0 then
         buffer[#buffer+1] = char(0xDB)          -- str32
-        buffer[#buffer+1] = packint(n, 4, 'b')
+        buffer[#buffer+1] = pack('>I4', n)
     else
         error"overflow in pack 'string'"
     end
@@ -113,10 +104,10 @@ packers['binary'] = function (buffer, str)
                                  n)
     elseif n <= 0xFFFF then
         buffer[#buffer+1] = char(0xC5)          -- bin16
-        buffer[#buffer+1] = packint(n, 2, 'b')
-    elseif n <= 0xFFFFFFFF then
+        buffer[#buffer+1] = pack('>I2', n)
+    elseif n <= 0xFFFFFFFF.0 then
         buffer[#buffer+1] = char(0xC6)          -- bin32
-        buffer[#buffer+1] = packint(n, 4, 'b')
+        buffer[#buffer+1] = pack('>I4', n)
     else
         error"overflow in pack 'binary'"
     end
@@ -141,10 +132,10 @@ packers['map'] = function (buffer, tbl, n)
         buffer[#buffer+1] = char(0x80 + n)      -- fixmap
     elseif n <= 0xFFFF then
         buffer[#buffer+1] = char(0xDE)          -- map16
-        buffer[#buffer+1] = packint(n, 2, 'b')
-    elseif n <= 0xFFFFFFFF then
+        buffer[#buffer+1] = pack('>I2', n)
+    elseif n <= 0xFFFFFFFF.0 then
         buffer[#buffer+1] = char(0xDF)          -- map32
-        buffer[#buffer+1] = packint(n, 4, 'b')
+        buffer[#buffer+1] = pack('>I4', n)
     else
         error"overflow in pack 'map'"
     end
@@ -159,10 +150,10 @@ packers['array'] = function (buffer, tbl, n)
         buffer[#buffer+1] = char(0x90 + n)      -- fixarray
     elseif n <= 0xFFFF then
         buffer[#buffer+1] = char(0xDC)          -- array16
-        buffer[#buffer+1] = packint(n, 2, 'b')
-    elseif n <= 0xFFFFFFFF then
+        buffer[#buffer+1] = pack('>I2', n)
+    elseif n <= 0xFFFFFFFF.0 then
         buffer[#buffer+1] = char(0xDD)          -- array32
-        buffer[#buffer+1] = packint(n, 4, 'b')
+        buffer[#buffer+1] = pack('>I4', n)
     else
         error"overflow in pack 'array'"
     end
@@ -241,29 +232,29 @@ packers['unsigned'] = function (buffer, n)
                                      n)
         elseif n <= 0xFFFF then
             buffer[#buffer+1] = char(0xCD)      -- uint16
-            buffer[#buffer+1] = packint(n, 2, 'b')
-        elseif n <= 0xFFFFFFFF then
+            buffer[#buffer+1] = pack('>I2', n)
+        elseif n <= 0xFFFFFFFF.0 then
             buffer[#buffer+1] = char(0xCE)      -- uint32
-            buffer[#buffer+1] = packint(n, 4, 'b')
+            buffer[#buffer+1] = pack('>I4', n)
         else
             buffer[#buffer+1] = char(0xCF)      -- uint64
-            buffer[#buffer+1] = packint(n, 8, 'b')
+            buffer[#buffer+1] = pack('>I8', n)
         end
     else
         if n >= -0x20 then
             buffer[#buffer+1] = char(0x100 + n) -- fixnum_neg
         elseif n >= -0x80 then
             buffer[#buffer+1] = char(0xD0)      -- int8
-            buffer[#buffer+1] = packint(n, 1, 'b')
+            buffer[#buffer+1] = pack('>i1', n)
         elseif n >= -0x8000 then
             buffer[#buffer+1] = char(0xD1)      -- int16
-            buffer[#buffer+1] = packint(n, 2, 'b')
+            buffer[#buffer+1] = pack('>i2', n)
         elseif n >= -0x80000000 then
             buffer[#buffer+1] = char(0xD2)      -- int32
-            buffer[#buffer+1] = packint(n, 4, 'b')
+            buffer[#buffer+1] = pack('>i4', n)
         else
             buffer[#buffer+1] = char(0xD3)      -- int64
-            buffer[#buffer+1] = packint(n, 8, 'b')
+            buffer[#buffer+1] = pack('>i8', n)
         end
     end
 end
@@ -274,29 +265,29 @@ packers['signed'] = function (buffer, n)
             buffer[#buffer+1] = char(n)         -- fixnum_pos
         elseif n <= 0x7FFF then
             buffer[#buffer+1] = char(0xD1)      -- int16
-            buffer[#buffer+1] = packint(n, 2, 'b')
+            buffer[#buffer+1] = pack('>i2', n)
         elseif n <= 0x7FFFFFFF then
             buffer[#buffer+1] = char(0xD2)      -- int32
-            buffer[#buffer+1] = packint(n, 4, 'b')
+            buffer[#buffer+1] = pack('>i4', n)
         else
             buffer[#buffer+1] = char(0xD3)      -- int64
-            buffer[#buffer+1] = packint(n, 8, 'b')
+            buffer[#buffer+1] = pack('>i8', n)
         end
     else
         if n >= -0x20 then
             buffer[#buffer+1] = char(0xE0 + 0x20 + n)   -- fixnum_neg
         elseif n >= -0x80 then
             buffer[#buffer+1] = char(0xD0)      -- int8
-            buffer[#buffer+1] = packint(n, 1, 'b')
+            buffer[#buffer+1] = pack('>i1', n)
         elseif n >= -0x8000 then
             buffer[#buffer+1] = char(0xD1)      -- int16
-            buffer[#buffer+1] = packint(n, 2, 'b')
+            buffer[#buffer+1] = pack('>i2', n)
         elseif n >= -0x80000000 then
             buffer[#buffer+1] = char(0xD2)      -- int32
-            buffer[#buffer+1] = packint(n, 4, 'b')
+            buffer[#buffer+1] = pack('>i4', n)
         else
             buffer[#buffer+1] = char(0xD3)      -- int64
-            buffer[#buffer+1] = packint(n, 8, 'b')
+            buffer[#buffer+1] = pack('>i8', n)
         end
     end
 end
@@ -314,12 +305,12 @@ m.set_integer = set_integer
 
 packers['float'] = function (buffer, n)
     buffer[#buffer+1] = char(0xCA)
-    buffer[#buffer+1] = packfloat(n, 'f', 'b')
+    buffer[#buffer+1] = pack('>f', n)
 end
 
 packers['double'] = function (buffer, n)
     buffer[#buffer+1] = char(0xCB)
-    buffer[#buffer+1] = packfloat(n, 'd', 'b')
+    buffer[#buffer+1] = pack('>d', n)
 end
 
 local set_number = function (number)
@@ -348,12 +339,12 @@ end
 m.set_number = set_number
 
 for k = 0, 4 do
-    local n = 2^k
+    local n = tointeger(2^k)
     local fixext = 0xD4 + k
-    packers['fixext' .. n] = function (buffer, tag, data)
-        assert(#data == n, "bad length for fixext" .. n)
+    packers['fixext' .. tostring(n)] = function (buffer, tag, data)
+        assert(#data == n, "bad length for fixext" .. tostring(n))
         buffer[#buffer+1] = char(fixext)
-        buffer[#buffer+1] = packint(tag, 1, 'b')
+        buffer[#buffer+1] = pack('>i1', tag)
         buffer[#buffer+1] = data
     end
 end
@@ -363,15 +354,15 @@ packers['ext'] = function (buffer, tag, data)
     if n <= 0xFF then
         buffer[#buffer+1] = char(0xC7,          -- ext8
                                  n)
-        buffer[#buffer+1] = packint(tag, 1, 'b')
+        buffer[#buffer+1] = pack('>i1', tag)
     elseif n <= 0xFFFF then
         buffer[#buffer+1] = char(0xC8)          -- ext16
-        buffer[#buffer+1] = packint(n, 2, 'b')
-        buffer[#buffer+1] = packint(tag, 1, 'b')
-    elseif n <= 0xFFFFFFFF then
+        buffer[#buffer+1] = pack('>I2', n)
+        buffer[#buffer+1] = pack('>i1', tag)
+    elseif n <= 0xFFFFFFFF.0 then
         buffer[#buffer+1] = char(0xC9)          -- ext32
-        buffer[#buffer+1] = packint(n, 4, 'b')
-        buffer[#buffer+1] = packint(tag, 1, 'b')
+        buffer[#buffer+1] = pack('>I4', n)
+        buffer[#buffer+1] = pack('>i1', tag)
     else
         error"overflow in pack 'ext'"
     end
@@ -431,7 +422,7 @@ local types_map = setmetatable({
         elseif k > 0xDF then
             return 'fixnum_neg'
         else
-            return 'reserved' .. k
+            return 'reserved' .. tostring(k)
         end
 end })
 m.types_map = types_map
@@ -440,24 +431,6 @@ local unpackers = setmetatable({}, {
     __index = function (t, k) error("unpack '" .. k .. "' is unimplemented") end
 })
 m.unpackers = unpackers
-
-local function unpackuint8 (s, i)
-    return s:sub(i, i):byte()
-end
-
-local function unpackuint16 (s, i)
-    local v = unpackint(s, i, 2, 'b')
-    return v < 0 and v + 0x10000 or v
-end
-
-local function unpackuint32 (s, i)
-    local v = unpackint(s, i, 4, 'b')
-    return v < 0 and v + 0x100000000 or v
-end
-
-local function unpackuint64 (s, i)
-    return unpackint(s, i, 8, 'b')
-end
 
 local function unpack_array (c, n)
     local t = {}
@@ -484,7 +457,7 @@ unpackers['any'] = function (c)
         c:underflow(i)
         s, i, j = c.s, c.i, c.j
     end
-    local val = unpackuint8(s, i)
+    local val = s:sub(i, i):byte()
     c.i = i+1
     return unpackers[types_map[val]](c, val)
 end
@@ -508,7 +481,7 @@ unpackers['float'] = function (c)
         s, i, j = c.s, c.i, c.j
     end
     c.i = i+4
-    return unpackfloat(s, i, 'f', 'b')
+    return unpack('>f', s, i)
 end
 
 unpackers['double'] = function (c)
@@ -518,7 +491,7 @@ unpackers['double'] = function (c)
         s, i, j = c.s, c.i, c.j
     end
     c.i = i+8
-    return unpackfloat(s, i, 'd', 'b')
+    return unpack('>d', s, i)
 end
 
 unpackers['fixnum_pos'] = function (c, val)
@@ -532,7 +505,7 @@ unpackers['uint8'] = function (c)
         s, i, j = c.s, c.i, c.j
     end
     c.i = i+1
-    return unpackuint8(s, i)
+    return unpack('>I1', s, i)
 end
 
 unpackers['uint16'] = function (c)
@@ -542,7 +515,7 @@ unpackers['uint16'] = function (c)
         s, i, j = c.s, c.i, c.j
     end
     c.i = i+2
-    return unpackuint16(s, i)
+    return unpack('>I2', s, i)
 end
 
 unpackers['uint32'] = function (c)
@@ -552,7 +525,7 @@ unpackers['uint32'] = function (c)
         s, i, j = c.s, c.i, c.j
     end
     c.i = i+4
-    return unpackuint32(s, i)
+    return unpack('>I4', s, i)
 end
 
 unpackers['uint64'] = function (c)
@@ -562,7 +535,7 @@ unpackers['uint64'] = function (c)
         s, i, j = c.s, c.i, c.j
     end
     c.i = i+8
-    return unpackuint64(s, i)
+    return unpack('>I8', s, i)
 end
 
 unpackers['fixnum_neg'] = function (c, val)
@@ -576,7 +549,7 @@ unpackers['int8'] = function (c)
         s, i, j = c.s, c.i, c.j
     end
     c.i = i+1
-    return unpackint(s, i, 1, 'b')
+    return unpack('>i1', s, i)
 end
 
 unpackers['int16'] = function (c)
@@ -586,7 +559,7 @@ unpackers['int16'] = function (c)
         s, i, j = c.s, c.i, c.j
     end
     c.i = i+2
-    return unpackint(s, i, 2, 'b')
+    return unpack('>i2', s, i)
 end
 
 unpackers['int32'] = function (c)
@@ -596,7 +569,7 @@ unpackers['int32'] = function (c)
         s, i, j = c.s, c.i, c.j
     end
     c.i = i+4
-    return unpackint(s, i, 4, 'b')
+    return unpack('>i4', s, i)
 end
 
 unpackers['int64'] = function (c)
@@ -606,7 +579,7 @@ unpackers['int64'] = function (c)
         s, i, j = c.s, c.i, c.j
     end
     c.i = i+8
-    return unpackint(s, i, 8, 'b')
+    return unpack('>i8', s, i)
 end
 
 unpackers['fixstr'] = function (c, val)
@@ -628,7 +601,7 @@ unpackers['str8'] = function (c)
         c:underflow(i)
         s, i, j = c.s, c.i, c.j
     end
-    local n = unpackuint8(s, i)
+    local n = unpack('>I1', s, i)
     i = i+1
     c.i = i
     local e = i+n-1
@@ -647,7 +620,7 @@ unpackers['str16'] = function (c)
         c:underflow(i+1)
         s, i, j = c.s, c.i, c.j
     end
-    local n = unpackuint16(s, i)
+    local n = unpack('>I2', s, i)
     i = i+2
     c.i = i
     local e = i+n-1
@@ -666,7 +639,7 @@ unpackers['str32'] = function (c)
         c:underflow(i+3)
         s, i, j = c.s, c.i, c.j
     end
-    local n = unpackuint32(s, i)
+    local n = unpack('>I4', s, i)
     i = i+4
     c.i = i
     local e = i+n-1
@@ -693,7 +666,7 @@ unpackers['array16'] = function (c)
         c:underflow(i+1)
         s, i, j = c.s, c.i, c.j
     end
-    local n = unpackuint16(s, i)
+    local n = unpack('>I2', s, i)
     c.i = i+2
     return unpack_array(c, n)
 end
@@ -704,7 +677,7 @@ unpackers['array32'] = function (c)
         c:underflow(i+3)
         s, i, j = c.s, c.i, c.j
     end
-    local n = unpackuint32(s, i)
+    local n = unpack('>I4', s, i)
     c.i = i+4
     return unpack_array(c, n)
 end
@@ -719,7 +692,7 @@ unpackers['map16'] = function (c)
         c:underflow(i+1)
         s, i, j = c.s, c.i, c.j
     end
-    local n = unpackuint16(s, i)
+    local n = unpack('>I2', s, i)
     c.i = i+2
     return unpack_map(c, n)
 end
@@ -730,7 +703,7 @@ unpackers['map32'] = function (c)
         c:underflow(i+3)
         s, i, j = c.s, c.i, c.j
     end
-    local n = unpackuint32(s, i)
+    local n = unpack('>I4', s, i)
     c.i = i+4
     return unpack_map(c, n)
 end
@@ -740,14 +713,14 @@ function m.build_ext (tag, data)
 end
 
 for k = 0, 4 do
-    local n = 2^k
-    unpackers['fixext' .. n] = function (c)
+    local n = tointeger(2^k)
+    unpackers['fixext' .. tostring(n)] = function (c)
         local s, i, j = c.s, c.i, c.j
         if i > j then
             c:underflow(i)
             s, i, j = c.s, c.i, c.j
         end
-        local tag = unpackint(s, i, 1, 'b')
+        local tag = unpack('>i1', s, i)
         i = i+1
         c.i = i
         local e = i+n-1
@@ -767,14 +740,14 @@ unpackers['ext8'] = function (c)
         c:underflow(i)
         s, i, j = c.s, c.i, c.j
     end
-    local n = unpackuint8(s, i)
+    local n = unpack('>I1', s, i)
     i = i+1
     c.i = i
     if i > j then
         c:underflow(i)
         s, i, j = c.s, c.i, c.j
     end
-    local tag = unpackint(s, i, 1, 'b')
+    local tag = unpack('>i1', s, i)
     i = i+1
     c.i = i
     local e = i+n-1
@@ -793,14 +766,14 @@ unpackers['ext16'] = function (c)
         c:underflow(i+1)
         s, i, j = c.s, c.i, c.j
     end
-    local n = unpackuint16(s, i)
+    local n = unpack('>I2', s, i)
     i = i+2
     c.i = i
     if i > j then
         c:underflow(i)
         s, i, j = c.s, c.i, c.j
     end
-    local tag = unpackint(s, i, 1, 'b')
+    local tag = unpack('>i1', s, i)
     i = i+1
     c.i = i
     local e = i+n-1
@@ -819,14 +792,14 @@ unpackers['ext32'] = function (c)
         c:underflow(i+3)
         s, i, j = c.s, c.i, c.j
     end
-    local n = unpackuint32(s, i)
+    local n = unpack('>I4', s, i)
     i = i+4
     c.i = i
     if i > j then
         c:underflow(i)
         s, i, j = c.s, c.i, c.j
     end
-    local tag = unpackint(s, i, 1, 'b')
+    local tag = unpack('>i1', s, i)
     i = i+1
     c.i = i
     local e = i+n-1
@@ -908,19 +881,20 @@ end
 
 set_string'string_compat'
 set_integer'signed'
-if NUMBER_INTEGRAL then
+if math_type(0.0) == math_type(0) then
     set_number'integer'
-elseif SIZEOF_NUMBER == 4 then
+elseif #pack('n', 0.0) == 4 then
+    m.small_lua = true
     set_number'float'
 else
+    m.full64bits = true
     set_number'double'
 end
 set_array'without_hole'
 
-m.full64bits = true
-m._VERSION = "0.3.0"
+m._VERSION = "0.3.2"
 m._DESCRIPTION = "lua-MessagePack : a pure Lua implementation"
-m._COPYRIGHT = "Copyright (c) 2012-2014 Francois Perrad"
+m._COPYRIGHT = "Copyright (c) 2012-2015 Francois Perrad"
 return m
 --
 -- This library is licensed under the terms of the MIT/X11 license,

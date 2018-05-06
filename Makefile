@@ -84,16 +84,31 @@ dist: $(TARBALL)
 
 rockspec: $(TARBALL)
 	perl -e '$(rockspec_pl)' rockspec.in > rockspec/lua-messagepack-$(VERSION)-$(REV).rockspec
+	perl -e '$(rockspec_pl)' rockspec.lua53.in > rockspec/lua-messagepack-lua53-$(VERSION)-$(REV).rockspec
+
+rock:
+	luarocks pack rockspec/lua-messagepack-$(VERSION)-$(REV).rockspec
+	luarocks pack rockspec/lua-messagepack-lua53-$(VERSION)-$(REV).rockspec
 
 check: test
 
 test:
 	cd $(SRC) && prove --exec=$(LUA) ../test/*.t
 
+luacheck:
+	luacheck --std=max --no-unused-args src --ignore j
+	luacheck --std=max --no-unused-args src5.3 --ignore j
+	luacheck --std=max --config .test.luacheckrc test/*.t
+
 coverage:
 	rm -f src/luacov.stats.out src/luacov.report.out
-	cd src && prove --exec="$(LUA) -lluacov" ../test/*.t
-	cd src && luacov
+	cd $(SRC) && prove --exec="$(LUA) -lluacov" ../test/*.t
+	cd $(SRC) && luacov
+
+coveralls:
+	rm -f src/luacov.stats.out src/luacov.report.out
+	cd $(SRC) && prove --exec="$(LUA) -lluacov" ../test/*.t
+	cd $(SRC) && luacov-coveralls -e ^/usr -e %.t$
 
 README.html: README.md
 	Markdown.pl README.md > README.html
