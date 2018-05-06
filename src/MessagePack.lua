@@ -32,8 +32,9 @@ local huge = require'math'.huge
 local tconcat = require'table'.concat
 
 --[[ debug only
+local format = require'string'.format
 local function hexadump (s)
-    return (s:gsub('.', function (c) return string.format('%02X ', c:byte()) end))
+    return (s:gsub('.', function (c) return format('%02X ', c:byte()) end))
 end
 --]]
 
@@ -96,63 +97,97 @@ packers['string'] = function (buffer, str)
     buffer[#buffer+1] = str
 end
 
-packers['table'] = function (buffer, tbl)
-    local is_map, n, max = false, 0, 0
-    for k in pairs(tbl) do
-        if type(k) == 'number' and k > 0 then
-            if k > max then
-                max = k
-            end
-        else
-            is_map = true
-        end
-        n = n + 1
-    end
-    if max ~= n then    -- there are holes
-        is_map = true
-    end
-    if is_map then
-        if n <= 0x0F then
-            buffer[#buffer+1] = char(0x80 + n)  -- fixmap
-        elseif n <= 0xFFFF then
-            buffer[#buffer+1] = char(0xDE,      -- map16
-                                     floor(n / 0x100),
-                                     n % 0x100)
-        elseif n <= 0xFFFFFFFF then
-            buffer[#buffer+1] = char(0xDF,      -- map32
-                                     floor(n / 0x1000000),
-                                     floor(n / 0x10000) % 0x100,
-                                     floor(n / 0x100) % 0x100,
-                                     n % 0x100)
-        else
-            error"overflow in pack 'map'"
-        end
-        for k, v in pairs(tbl) do
-            packers[type(k)](buffer, k)
-            packers[type(v)](buffer, v)
-        end
+packers['map'] = function (buffer, tbl, n)
+    if n <= 0x0F then
+        buffer[#buffer+1] = char(0x80 + n)      -- fixmap
+    elseif n <= 0xFFFF then
+        buffer[#buffer+1] = char(0xDE,          -- map16
+                                 floor(n / 0x100),
+                                 n % 0x100)
+    elseif n <= 0xFFFFFFFF then
+        buffer[#buffer+1] = char(0xDF,          -- map32
+                                 floor(n / 0x1000000),
+                                 floor(n / 0x10000) % 0x100,
+                                 floor(n / 0x100) % 0x100,
+                                 n % 0x100)
     else
-        if n <= 0x0F then
-            buffer[#buffer+1] = char(0x90 + n)  -- fixarray
-        elseif n <= 0xFFFF then
-            buffer[#buffer+1] = char(0xDC,      -- array16
-                                     floor(n / 0x100),
-                                     n % 0x100)
-        elseif n <= 0xFFFFFFFF then
-            buffer[#buffer+1] = char(0xDD,      -- array32
-                                     floor(n / 0x1000000),
-                                     floor(n / 0x10000) % 0x100,
-                                     floor(n / 0x100) % 0x100,
-                                     n % 0x100)
-        else
-            error"overflow in pack 'array'"
-        end
-        for i = 1, n do
-            local v = tbl[i]
-            packers[type(v)](buffer, v)
-        end
+        error"overflow in pack 'map'"
+    end
+    for k, v in pairs(tbl) do
+        packers[type(k)](buffer, k)
+        packers[type(v)](buffer, v)
     end
 end
+
+packers['array'] = function (buffer, tbl, n)
+    if n <= 0x0F then
+        buffer[#buffer+1] = char(0x90 + n)      -- fixarray
+    elseif n <= 0xFFFF then
+        buffer[#buffer+1] = char(0xDC,          -- array16
+                                 floor(n / 0x100),
+                                 n % 0x100)
+    elseif n <= 0xFFFFFFFF then
+        buffer[#buffer+1] = char(0xDD,          -- array32
+                                 floor(n / 0x1000000),
+                                 floor(n / 0x10000) % 0x100,
+                                 floor(n / 0x100) % 0x100,
+                                 n % 0x100)
+    else
+        error"overflow in pack 'array'"
+    end
+    for i = 1, n do
+        local v = tbl[i]
+        packers[type(v)](buffer, v)
+    end
+end
+
+local set_array = function (array)
+    if array == 'without_hole' then
+        packers['table'] = function (buffer, tbl)
+            local is_map, n, max = false, 0, 0
+            for k in pairs(tbl) do
+                if type(k) == 'number' and k > 0 then
+                    if k > max then
+                        max = k
+                    end
+                else
+                    is_map = true
+                end
+                n = n + 1
+            end
+            if max ~= n then    -- there are holes
+                is_map = true
+            end
+            if is_map then
+                return packers['map'](buffer, tbl, n)
+            else
+                return packers['array'](buffer, tbl, n)
+            end
+        end
+    elseif array == 'with_hole' then
+        packers['table'] = function (buffer, tbl)
+            local is_map, n, max = false, 0, 0
+            for k in pairs(tbl) do
+                if type(k) == 'number' and k > 0 then
+                    if k > max then
+                        max = k
+                    end
+                else
+                    is_map = true
+                end
+                n = n + 1
+            end
+            if is_map then
+                return packers['map'](buffer, tbl, n)
+            else
+                return packers['array'](buffer, tbl, max)
+            end
+        end
+    else
+        argerror('set_array', 1, "invalid option '" .. array .."'")
+    end
+end
+m.set_array = set_array
 
 packers['unsigned'] = function (buffer, n)
     if n >= 0 then
@@ -419,9 +454,8 @@ m.unpackers = unpackers
 local function unpack_array (c, n)
     local t = {}
     local decode = unpackers['any']
-    while n > 0 do
-        t[#t+1] = decode(c)
-        n = n-1
+    for i = 1, n do
+        t[i] = decode(c)
     end
     return t
 end
@@ -429,10 +463,9 @@ end
 local function unpack_map (c, n)
     local t = {}
     local decode = unpackers['any']
-    while n > 0 do
+    for i = 1, n do
         local k = decode(c)
         t[k] = decode(c)
-        n = n-1
     end
     return t
 end
@@ -810,8 +843,9 @@ elseif SIZEOF_NUMBER == 4 then
 else
     set_number'double'
 end
+set_array'without_hole'
 
-m._VERSION = "0.2.0"
+m._VERSION = "0.2.1"
 m._DESCRIPTION = "lua-MessagePack : a pure Lua implementation"
 m._COPYRIGHT = "Copyright (c) 2012 Francois Perrad"
 return m

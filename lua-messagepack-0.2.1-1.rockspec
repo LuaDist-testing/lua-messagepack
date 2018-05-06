@@ -1,17 +1,17 @@
 -- This file was automatically generated for the LuaDist project.
 
 package = 'lua-MessagePack'
-version = '0.2.0-1'
+version = '0.2.1-1'
 -- LuaDist source
 source = {
-  tag = "0.2.0-1",
+  tag = "0.2.1-1",
   url = "git://github.com/LuaDist-testing/lua-messagepack.git"
 }
 -- Original source
 -- source = {
---     url = 'http://cloud.github.com/downloads/fperrad/lua-MessagePack/lua-messagepack-0.2.0.tar.gz',
---     md5 = 'bf08ae0e81c83fa512be9041a45de44e',
---     dir = 'lua-MessagePack-0.2.0',
+--     url = 'http://cloud.github.com/downloads/fperrad/lua-MessagePack/lua-messagepack-0.2.1.tar.gz',
+--     md5 = '867da634cbe61e83e6d052435afa8eaa',
+--     dir = 'lua-MessagePack-0.2.1',
 -- }
 description = {
     summary = "a pure Lua implementation",
