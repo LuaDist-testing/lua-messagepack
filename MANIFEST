@@ -1,0 +1,13 @@
+CHANGES
+COPYRIGHT
+MANIFEST
+Makefile
+README.md
+doc/Makefile
+doc/index.html
+doc/msgpack.html
+rockspec.in
+src/MessagePack.lua
+test/00-require.t
+test/01-spectest.t
+test/02-except.t
