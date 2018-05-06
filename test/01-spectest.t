@@ -40,12 +40,20 @@ local data = {
     -0.0,               "-0.0 double",
     1.0,                "1.0 double",
     -1.0,               "-1.0 double",
-    "a",                "\"a\" FixRaw",
-    "a",                "\"a\" raw 16",
-    "a",                "\"a\" raw 32",
-    "",                 "\"\" FixRaw",
-    "",                 "\"\" raw 16",
-    "",                 "\"\" raw 32",
+    "a",                "\"a\" FixStr",
+    "a",                "\"a\" str 8",
+    "a",                "\"a\" str 16",
+    "a",                "\"a\" str 32",
+    "",                 "\"\" FixStr",
+    "",                 "\"\" str 8",
+    "",                 "\"\" str 16",
+    "",                 "\"\" str 32",
+    "a",                "\"a\" bin 8",
+    "a",                "\"a\" bin 16",
+    "a",                "\"a\" bin 32",
+    "",                 "\"\" bin 8",
+    "",                 "\"\" bin 16",
+    "",                 "\"\" bin 32",
     { 0 },              "[0] FixArray",
     { 0 },              "[0] array 16",
     { 0 },              "[0] array 32",
@@ -60,9 +68,18 @@ local data = {
     { a=97 },           "{\"a\"=>97} map 32",
     { {} },             "[[]]",
     { {"a"} },          "[[\"a\"]]",
+
+    nil,                "fixext 1",
+    nil,                "fixext 2",
+    nil,                "fixext 4",
+    nil,                "fixext 8",
+    nil,                "fixext 16",
+    nil,                "ext 8",
+    nil,                "ext 16",
+    nil,                "ext 32",
 }
 
-plan(3 * #data)
+plan(8 * 69)
 
 -- see http://github.com/msgpack/msgpack/blob/master/test/cases_gen.rb
 local source = [===[
@@ -99,12 +116,20 @@ ca 80 00 00 00                  # -0.0 float
 cb 80 00 00 00 00 00 00 00      # -0.0 double
 cb 3f f0 00 00 00 00 00 00      # 1.0 double
 cb bf f0 00 00 00 00 00 00      # -1.0 double
-a1 61                           # "a" FixRaw
-da 00 01 61                     # "a" raw 16
-db 00 00 00 01 61               # "a" raw 32
-a0                              # "" FixRaw
-da 00 00                        # "" raw 16
-db 00 00 00 00                  # "" raw 32
+a1 61                           # "a" FixStr
+d9 01 61                        # "a" str 8
+da 00 01 61                     # "a" str 16
+db 00 00 00 01 61               # "a" str 32
+a0                              # "" FixStr
+d9 00                           # "" str 8
+da 00 00                        # "" str 16
+db 00 00 00 00                  # "" str 32
+c4 01 61                        # "a" bin 8
+c5 00 01 61                     # "a" bin 16
+c6 00 00 00 01 61               # "a" bin 32
+c4 00                           # "" bin 8
+c5 00 00                        # "" bin 16
+c6 00 00 00 00                  # "" bin 32
 91 00                           # [0] FixArray
 dc 00 01 00                     # [0] array 16
 dd 00 00 00 01 00               # [0] array 32
@@ -119,6 +144,15 @@ de 00 01 a1 61 61               # {"a"=>97} map 16
 df 00 00 00 01 a1 61 61         # {"a"=>97} map 32
 91 90                           # [[]]
 91 91 a1 61                     # [["a"]]
+
+d4 01 01                        # fixext 1
+d5 02 02 01                     # fixext 2
+d6 04 04 03 02 01               # fixext 4
+d7 08 08 07 06 05 04 03 02 01   # fixext 8
+d8 16 10 0f 0e 0d 0c 0b 0a 09 08 07 06 05 04 03 02 01   # fixext 16
+c7 01 08 61                     # ext 8
+c8 00 01 16 61                  # ext 16
+c9 00 00 00 01 32 61            # ext 32
 ]===]
 
 source = source:gsub('#[^\n]+', '')
@@ -177,7 +211,8 @@ for _, val in mp.unpacker(s) do
 end
 os.remove 'cases.mpac'  -- clean up
 
-mp.set_integer'unsigned'
+diag("set_string'string'")
+mp.set_string'string'
 local i = 1
 for _, val in mp.unpacker(mpac) do
     if type(val) == 'table' then
@@ -188,6 +223,33 @@ for _, val in mp.unpacker(mpac) do
     i = i + 2
 end
 
+diag("set_string'binary'")
+mp.set_string'binary'
+local i = 1
+for _, val in mp.unpacker(mpac) do
+    if type(val) == 'table' then
+        is_deeply(mp.unpack(mp.pack(data[i])), data[i], "unpack/pack " .. data[i+1])
+    else
+        is(mp.unpack(mp.pack(data[i])), data[i], "unpack/pack " .. data[i+1])
+    end
+    i = i + 2
+end
+mp.set_string'string_compat'
+
+diag("set_integer'unsigned'")
+mp.set_integer'unsigned'
+local i = 1
+for _, val in mp.unpacker(mpac) do
+    if type(val) == 'table' then
+        is_deeply(mp.unpack(mp.pack(data[i])), data[i], "unpack/pack " .. data[i+1])
+    else
+        is(mp.unpack(mp.pack(data[i])), data[i], "unpack/pack " .. data[i+1])
+    end
+    i = i + 2
+end
+mp.set_integer'signed'
+
+diag("set_number'float'")
 mp.set_number'float'
 local i = 1
 for _, val in mp.unpacker(mpac) do
@@ -199,6 +261,7 @@ for _, val in mp.unpacker(mpac) do
     i = i + 2
 end
 
+diag("set_number'integer'")
 mp.set_number'integer'
 local i = 1
 for _, val in mp.unpacker(mpac) do

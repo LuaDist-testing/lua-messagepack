@@ -13,3 +13,8 @@ test/01-spectest.t
 test/02-except.t
 test/03-edge.t
 test/04-cover.t
+test/11-userdata-bc.t
+test/12-metatable.t
+test/13-coat.t
+test/14-function.t
+test/15-ffi-cdata.t

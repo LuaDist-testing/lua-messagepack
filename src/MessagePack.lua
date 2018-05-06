@@ -18,6 +18,7 @@ if not jit then
     NUMBER_INTEGRAL = 1 == header[12]
 end
 
+local assert = assert
 local error = error
 local pairs = pairs
 local pcall = pcall
@@ -77,16 +78,39 @@ packers['boolean'] = function (buffer, bool)
     end
 end
 
-packers['string'] = function (buffer, str)
+packers['string_compat'] = function (buffer, str)
     local n = #str
     if n <= 0x1F then
-        buffer[#buffer+1] = char(0xA0 + n)      -- fixraw
+        buffer[#buffer+1] = char(0xA0 + n)      -- fixstr
     elseif n <= 0xFFFF then
-        buffer[#buffer+1] = char(0xDA,          -- raw16
+        buffer[#buffer+1] = char(0xDA,          -- str16
                                  floor(n / 0x100),
                                  n % 0x100)
     elseif n <= 0xFFFFFFFF then
-        buffer[#buffer+1] = char(0xDB,          -- raw32
+        buffer[#buffer+1] = char(0xDB,          -- str32
+                                 floor(n / 0x1000000),
+                                 floor(n / 0x10000) % 0x100,
+                                 floor(n / 0x100) % 0x100,
+                                 n % 0x100)
+    else
+        error"overflow in pack 'string_compat'"
+    end
+    buffer[#buffer+1] = str
+end
+
+packers['_string'] = function (buffer, str)
+    local n = #str
+    if n <= 0x1F then
+        buffer[#buffer+1] = char(0xA0 + n)      -- fixstr
+    elseif n <= 0xFF then
+        buffer[#buffer+1] = char(0xD9,          -- str8
+                                 n)
+    elseif n <= 0xFFFF then
+        buffer[#buffer+1] = char(0xDA,          -- str16
+                                 floor(n / 0x100),
+                                 n % 0x100)
+    elseif n <= 0xFFFFFFFF then
+        buffer[#buffer+1] = char(0xDB,          -- str32
                                  floor(n / 0x1000000),
                                  floor(n / 0x10000) % 0x100,
                                  floor(n / 0x100) % 0x100,
@@ -96,6 +120,40 @@ packers['string'] = function (buffer, str)
     end
     buffer[#buffer+1] = str
 end
+
+packers['binary'] = function (buffer, str)
+    local n = #str
+    if n <= 0xFF then
+        buffer[#buffer+1] = char(0xC4,          -- bin8
+                                 n)
+    elseif n <= 0xFFFF then
+        buffer[#buffer+1] = char(0xC5,          -- bin16
+                                 floor(n / 0x100),
+                                 n % 0x100)
+    elseif n <= 0xFFFFFFFF then
+        buffer[#buffer+1] = char(0xC6,          -- bin32
+                                 floor(n / 0x1000000),
+                                 floor(n / 0x10000) % 0x100,
+                                 floor(n / 0x100) % 0x100,
+                                 n % 0x100)
+    else
+        error"overflow in pack 'binary'"
+    end
+    buffer[#buffer+1] = str
+end
+
+local set_string = function (str)
+    if str == 'string_compat' then
+        packers['string'] = packers['string_compat']
+    elseif str == 'string' then
+        packers['string'] = packers['_string']
+    elseif str == 'binary' then
+        packers['string'] = packers['binary']
+    else
+        argerror('set_string', 1, "invalid option '" .. str .."'")
+    end
+end
+m.set_string = set_string
 
 packers['map'] = function (buffer, tbl, n)
     if n <= 0x0F then
@@ -143,7 +201,7 @@ end
 
 local set_array = function (array)
     if array == 'without_hole' then
-        packers['table'] = function (buffer, tbl)
+        packers['_table'] = function (buffer, tbl)
             local is_map, n, max = false, 0, 0
             for k in pairs(tbl) do
                 if type(k) == 'number' and k > 0 then
@@ -165,7 +223,7 @@ local set_array = function (array)
             end
         end
     elseif array == 'with_hole' then
-        packers['table'] = function (buffer, tbl)
+        packers['_table'] = function (buffer, tbl)
             local is_map, n, max = false, 0, 0
             for k in pairs(tbl) do
                 if type(k) == 'number' and k > 0 then
@@ -188,6 +246,10 @@ local set_array = function (array)
     end
 end
 m.set_array = set_array
+
+packers['table'] = function (buffer, tbl)
+    return packers['_table'](buffer, tbl)
+end
 
 packers['unsigned'] = function (buffer, n)
     if n >= 0 then
@@ -410,6 +472,41 @@ local set_number = function (number)
 end
 m.set_number = set_number
 
+for k = 0, 4 do
+    local n = 2^k
+    local fixext = 0xD4 + k
+    packers['fixext' .. n] = function (buffer, tag, data)
+        assert(#data == n, "bad length for fixext" .. n)
+        buffer[#buffer+1] = char(fixext,
+                                 tag < 0 and tag + 0x100 or tag)
+        buffer[#buffer+1] = data
+    end
+end
+
+packers['ext'] = function (buffer, tag, data)
+    local n = #data
+    if n <= 0xFF then
+        buffer[#buffer+1] = char(0xC7,          -- ext8
+                                 n,
+                                 tag < 0 and tag + 0x100 or tag)
+    elseif n <= 0xFFFF then
+        buffer[#buffer+1] = char(0xC8,          -- ext16
+                                 floor(n / 0x100),
+                                 n % 0x100,
+                                 tag < 0 and tag + 0x100 or tag)
+    elseif n <= 0xFFFFFFFF then
+        buffer[#buffer+1] = char(0xC9,          -- ext&32
+                                 floor(n / 0x1000000),
+                                 floor(n / 0x10000) % 0x100,
+                                 floor(n / 0x100) % 0x100,
+                                 n % 0x100,
+                                 tag < 0 and tag + 0x100 or tag)
+    else
+        error"overflow in pack 'ext'"
+    end
+    buffer[#buffer+1] = data
+end
+
 function m.pack (data)
     local buffer = {}
     packers[type(data)](buffer, data)
@@ -421,6 +518,12 @@ local types_map = setmetatable({
     [0xC0] = 'nil',
     [0xC2] = 'false',
     [0xC3] = 'true',
+    [0xC4] = 'bin8',
+    [0xC5] = 'bin16',
+    [0xC6] = 'bin32',
+    [0xC7] = 'ext8',
+    [0xC8] = 'ext16',
+    [0xC9] = 'ext32',
     [0xCA] = 'float',
     [0xCB] = 'double',
     [0xCC] = 'uint8',
@@ -431,8 +534,14 @@ local types_map = setmetatable({
     [0xD1] = 'int16',
     [0xD2] = 'int32',
     [0xD3] = 'int64',
-    [0xDA] = 'raw16',
-    [0xDB] = 'raw32',
+    [0xD4] = 'fixext1',
+    [0xD5] = 'fixext2',
+    [0xD6] = 'fixext4',
+    [0xD7] = 'fixext8',
+    [0xD8] = 'fixext16',
+    [0xD9] = 'str8',
+    [0xDA] = 'str16',
+    [0xDB] = 'str32',
     [0xDC] = 'array16',
     [0xDD] = 'array32',
     [0xDE] = 'map16',
@@ -446,7 +555,7 @@ local types_map = setmetatable({
             elseif k < 0xA0 then
                 return 'fixarray'
             else
-                return 'fixraw'
+                return 'fixstr'
             end
         elseif k > 0xDF then
             return 'fixnum_neg'
@@ -677,7 +786,7 @@ unpackers['int64'] = function (c)
     end
 end
 
-unpackers['fixraw'] = function (c, val)
+unpackers['fixstr'] = function (c, val)
     local s, i, j = c.s, c.i, c.j
     local n = val % 0x20
     local e = i+n-1
@@ -689,7 +798,25 @@ unpackers['fixraw'] = function (c, val)
     return s:sub(i, e)
 end
 
-unpackers['raw16'] = function (c)
+unpackers['str8'] = function (c)
+    local s, i, j = c.s, c.i, c.j
+    if i > j then
+        c:underflow(i)
+        s, i, j = c.s, c.i, c.j
+    end
+    local n = s:sub(i, i):byte()
+    i = i+1
+    c.i = i
+    local e = i+n-1
+    if e > j then
+        c:underflow(e)
+        s, i, j = c.s, c.i, c.j
+    end
+    c.i = i+n
+    return s:sub(i, e)
+end
+
+unpackers['str16'] = function (c)
     local s, i, j = c.s, c.i, c.j
     if i+1 > j then
         c:underflow(i+1)
@@ -708,7 +835,7 @@ unpackers['raw16'] = function (c)
     return s:sub(i, e)
 end
 
-unpackers['raw32'] = function (c)
+unpackers['str32'] = function (c)
     local s, i, j = c.s, c.i, c.j
     if i+3 > j then
         c:underflow(i+3)
@@ -726,6 +853,10 @@ unpackers['raw32'] = function (c)
     c.i = i+n
     return s:sub(i, e)
 end
+
+unpackers['bin8'] = unpackers['str8']
+unpackers['bin16'] = unpackers['str16']
+unpackers['bin32'] = unpackers['str32']
 
 unpackers['fixarray'] = function (c, val)
     return unpack_array(c, val % 0x10)
@@ -777,6 +908,108 @@ unpackers['map32'] = function (c)
     local b1, b2, b3, b4 = s:sub(i, i+3):byte(1, 4)
     c.i = i+4
     return unpack_map(c, ((b1 * 0x100 + b2) * 0x100 + b3) * 0x100 + b4)
+end
+
+function m.build_ext (tag, data)
+    return nil
+end
+
+for k = 0, 4 do
+    local n = 2^k
+    unpackers['fixext' .. n] = function (c)
+        local s, i, j = c.s, c.i, c.j
+        if i > j then
+            c:underflow(i)
+            s, i, j = c.s, c.i, c.j
+        end
+        local tag = s:sub(i, i):byte()
+        i = i+1
+        c.i = i
+        local e = i+n-1
+        if e > j then
+            c:underflow(e)
+            s, i, j = c.s, c.i, c.j
+        end
+        c.i = i+n
+        return m.build_ext(tag < 0x80 and tag or tag - 0x100, s:sub(i, e))
+    end
+end
+
+unpackers['ext8'] = function (c)
+    local s, i, j = c.s, c.i, c.j
+    if i > j then
+        c:underflow(i)
+        s, i, j = c.s, c.i, c.j
+    end
+    local n = s:sub(i, i):byte()
+    i = i+1
+    c.i = i
+    if i > j then
+        c:underflow(i)
+        s, i, j = c.s, c.i, c.j
+    end
+    local tag = s:sub(i, i):byte()
+    i = i+1
+    c.i = i
+    local e = i+n-1
+    if e > j then
+        c:underflow(e)
+        s, i, j = c.s, c.i, c.j
+    end
+    c.i = i+n
+    return m.build_ext(tag < 0x80 and tag or tag - 0x100, s:sub(i, e))
+end
+
+unpackers['ext16'] = function (c)
+    local s, i, j = c.s, c.i, c.j
+    if i+1 > j then
+        c:underflow(i+1)
+        s, i, j = c.s, c.i, c.j
+    end
+    local b1, b2 = s:sub(i, i+1):byte(1, 2)
+    i = i+2
+    c.i = i
+    local n = b1 * 0x100 + b2
+    if i > j then
+        c:underflow(i)
+        s, i, j = c.s, c.i, c.j
+    end
+    local tag = s:sub(i, i):byte()
+    i = i+1
+    c.i = i
+    local e = i+n-1
+    if e > j then
+        c:underflow(e)
+        s, i, j = c.s, c.i, c.j
+    end
+    c.i = i+n
+    return m.build_ext(tag < 0x80 and tag or tag - 0x100, s:sub(i, e))
+end
+
+unpackers['ext32'] = function (c)
+    local s, i, j = c.s, c.i, c.j
+    if i+3 > j then
+        c:underflow(i+3)
+        s, i, j = c.s, c.i, c.j
+    end
+    local b1, b2, b3, b4 = s:sub(i, i+3):byte(1, 4)
+    i = i+4
+    c.i = i
+    local n = ((b1 * 0x100 + b2) * 0x100 + b3) * 0x100 + b4
+    if i > j then
+        c:underflow(i)
+        s, i, j = c.s, c.i, c.j
+    end
+    local tag = s:sub(i, i):byte()
+    i = i+1
+    c.i = i
+    local e = i+n-1
+    if e > j then
+        c:underflow(e)
+        s, i, j = c.s, c.i, c.j
+    end
+    c.i = i+n
+    return m.build_ext(tag < 0x80 and tag or tag - 0x100, s:sub(i, e))
 end
 
 
@@ -845,6 +1078,7 @@ function m.unpacker (src)
     end
 end
 
+set_string'string_compat'
 set_integer'signed'
 if NUMBER_INTEGRAL then
     set_number'integer'
@@ -855,7 +1089,7 @@ else
 end
 set_array'without_hole'
 
-m._VERSION = "0.2.2"
+m._VERSION = "0.3.0"
 m._DESCRIPTION = "lua-MessagePack : a pure Lua implementation"
 m._COPYRIGHT = "Copyright (c) 2012-2013 Francois Perrad"
 return m

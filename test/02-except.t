@@ -2,7 +2,7 @@
 
 require 'Test.More'
 
-plan(18)
+plan(20)
 
 local mp = require 'MessagePack'
 
@@ -78,6 +78,11 @@ error_like( function ()
             "missing bytes" )
 
 error_like( function ()
+                mp.set_string'bad'
+            end,
+            "bad argument #1 to set_string %(invalid option 'bad'%)" )
+
+error_like( function ()
                 mp.set_number'bad'
             end,
             "bad argument #1 to set_number %(invalid option 'bad'%)" )
@@ -91,4 +96,9 @@ error_like( function ()
                 mp.set_array'bad'
             end,
             "bad argument #1 to set_array %(invalid option 'bad'%)" )
+
+error_like( function ()
+                mp.packers['fixext4'](nil, 1, '123')
+            end,
+            "bad length for fixext4" )
 
