@@ -79,7 +79,7 @@ local data = {
     nil,                "ext 32",
 }
 
-plan(8 * 69)
+plan(10 * 69)
 
 -- see http://github.com/msgpack/msgpack/blob/master/test/cases_gen.rb
 local source = [===[
@@ -272,3 +272,29 @@ for _, val in mp.unpacker(mpac) do
     end
     i = i + 2
 end
+mp.set_number'double'
+
+diag("set_array'with_hole'")
+mp.set_array'with_hole'
+local i = 1
+for _, val in mp.unpacker(mpac) do
+    if type(val) == 'table' then
+        is_deeply(mp.unpack(mp.pack(data[i])), data[i], "unpack/pack " .. data[i+1])
+    else
+        is(mp.unpack(mp.pack(data[i])), data[i], "unpack/pack " .. data[i+1])
+    end
+    i = i + 2
+end
+
+diag("set_array'always_as_map'")
+mp.set_array'always_as_map'
+local i = 1
+for _, val in mp.unpacker(mpac) do
+    if type(val) == 'table' then
+        is_deeply(mp.unpack(mp.pack(data[i])), data[i], "unpack/pack " .. data[i+1])
+    else
+        is(mp.unpack(mp.pack(data[i])), data[i], "unpack/pack " .. data[i+1])
+    end
+    i = i + 2
+end
+mp.set_array'without_hole'

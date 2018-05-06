@@ -90,7 +90,8 @@ The default is <code>'signed'</code>.</p>
 <h4><code>set_array( str )</code></h4>
 
 <p>Configures the behaviour of <code>pack</code>.
-The valid options are <code>'without_hole'</code> and <code>'with_hole'</code>.
+The valid options are <code>'without_hole'</code>, <code>'with_hole'</code>
+and <code>'always_as_map'</code>.
 The default is <code>'without_hole'</code>.</p>
 
 <h4><code>set_string( str )</code></h4>
@@ -123,6 +124,9 @@ The default is <code>'string_compat'</code> in order to be compatible with old i
 
   <li>An empty <code>table</code> is always converted
   into a <strong>MessagePack</strong> <code>array</code>.</li>
+
+  <li>With <code>set_array'always_as_map'</code>, all Lua <code>table</code> are converted
+  into a <strong>MessagePack</strong> <code>map</code>.</li>
 
   <li>LIMITATION : <strong>MessagePack</strong> cannot handle
   data with <em>cyclic reference</em>.</li>

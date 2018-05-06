@@ -2,7 +2,7 @@
 
 require 'Test.More'
 
-plan(32)
+plan(36)
 
 local mp = require 'MessagePack'
 
@@ -20,6 +20,12 @@ is( mp.unpack(mp.pack(2^21)), 2^21, "2^21" )
 is( mp.unpack(mp.pack(-2^21)), -2^21, "-2^21" )
 is( mp.unpack(mp.pack(2^51)), 2^51, "2^51" )
 is( mp.unpack(mp.pack(-2^51)), -2^51, "-2^51" )
+if mp.full64bits then
+    is( mp.unpack(mp.pack(2^61)), 2^61, "2^61" )
+    is( mp.unpack(mp.pack(-2^61)), -2^61, "-2^61" )
+else
+    skip("only 53 bits", 2)
+end
 
 mp.set_integer'unsigned'
 is( mp.unpack(mp.pack(2^5)), 2^5, "2^5" )
@@ -30,6 +36,12 @@ is( mp.unpack(mp.pack(2^21)), 2^21, "2^21" )
 is( mp.unpack(mp.pack(-2^21)), -2^21, "-2^21" )
 is( mp.unpack(mp.pack(2^51)), 2^51, "2^51" )
 is( mp.unpack(mp.pack(-2^51)), -2^51, "-2^51" )
+if mp.full64bits then
+    is( mp.unpack(mp.pack(2^61)), 2^61, "2^61" )
+    is( mp.unpack(mp.pack(-2^61)), -2^61, "-2^61" )
+else
+    skip("only 53 bits", 2)
+end
 
 mp.set_string'string'
 s = string.rep('x', 2^3)

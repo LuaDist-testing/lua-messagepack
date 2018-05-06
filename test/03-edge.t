@@ -2,7 +2,7 @@
 
 require 'Test.More'
 
-plan(24)
+plan(32)
 
 local mp = require 'MessagePack'
 
@@ -35,6 +35,17 @@ is_deeply( mp.unpack(mp.pack(t)), t )
 mp.set_array'with_hole'
 is( mp.pack(t):byte(), 0x90 + 4, "array with hole as array" )
 is_deeply( mp.unpack(mp.pack(t)), t )
+mp.set_array'always_as_map'
+is( mp.pack(t):byte(), 0x80 + 3, "always_as_map" )
+is_deeply( mp.unpack(mp.pack(t)), t )
+
+local t = {}
+mp.set_array'without_hole'
+is( mp.pack(t):byte(), 0x90, "empty table as array" )
+mp.set_array'with_hole'
+is( mp.pack(t):byte(), 0x90, "empty table as array" )
+mp.set_array'always_as_map'
+is( mp.pack(t):byte(), 0x80, "empty table as map" )
 
 mp.set_number'float'
 is( mp.pack(3.402824e+38), mp.pack(1/0), "float 3.402824e+38")
@@ -42,8 +53,13 @@ is( mp.pack(7e42), mp.pack(1/0), "inf (downcast double -> float)")
 is( mp.pack(-7e42), mp.pack(-1/0), "-inf (downcast double -> float)")
 is( mp.unpack(mp.pack(7e42)), 1/0, "inf (downcast double -> float)")
 is( mp.unpack(mp.pack(-7e42)), -1/0, "-inf (downcast double -> float)")
-is( mp.unpack(mp.pack(7e-42)), 0, "epsilon (downcast double -> float)")
-is( mp.unpack(mp.pack(-7e-42)), -0, "-epsilon (downcast double -> float)")
+is( mp.unpack(mp.pack(7e-46)), 0, "epsilon (downcast double -> float)")
+is( mp.unpack(mp.pack(-7e-46)), -0, "-epsilon (downcast double -> float)")
+
+mp.set_integer'unsigned'
+is( mp.unpack(mp.pack(0xF0)), 0xF0, "packint 0xF0")
+is( mp.unpack(mp.pack(0xF000)), 0xF000, "packint 0xF000")
+is( mp.unpack(mp.pack(0xF0000000)), 0xF0000000, "packint 0xF0000000")
 
 local buffer = {}
 mp.packers.float(buffer, 0)

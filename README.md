@@ -1,6 +1,5 @@
-
-lua-MessagePack : a pure Lua implementation
-===========================================
+lua-MessagePack : a pure Lua implementation (spec v5)
+=====================================================
 
 [![Build Status](https://travis-ci.org/fperrad/lua-MessagePack.png)](https://travis-ci.org/fperrad/lua-MessagePack)
 
@@ -13,7 +12,7 @@ It lets you exchange data among multiple languages like JSON but it's faster and
 
 It's a pure Lua implementation, without dependency.
 
-And it's really fast with LuaJIT.
+And it's really fast with [LuaJIT](http://luajit.org).
 
 Links
 -----
@@ -24,7 +23,7 @@ and the sources are hosted at [http://github.com/fperrad/lua-MessagePack/](http:
 Copyright and License
 ---------------------
 
-Copyright (c) 2012-2013 Francois Perrad
+Copyright (c) 2012-2014 Francois Perrad
 
 This library is licensed under the terms of the MIT/X11 license, like Lua itself.
 

@@ -19,3 +19,6 @@ type_ok( m.unpackers, 'table', "table unpackers" )
 type_ok( m.types_map, 'table', "table types_map" )
 type_ok( m.build_ext, 'function', "function build_ext" )
 
+if m.full64bits then
+    diag "full 64bits with Lua 5.3"
+end

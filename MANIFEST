@@ -8,6 +8,7 @@ doc/index.html
 doc/msgpack.html
 rockspec.in
 src/MessagePack.lua
+src5.3/MessagePack.lua
 test/00-require.t
 test/01-spectest.t
 test/02-except.t

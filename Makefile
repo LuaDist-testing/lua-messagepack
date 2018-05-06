@@ -10,11 +10,17 @@ DPREFIX := $(DESTDIR)$(PREFIX)
 LIBDIR  := $(DPREFIX)/share/lua/$(LUAVER)
 INSTALL := install
 
+ifeq ($(LUAVER),5.3)
+SRC     := src5.3
+else
+SRC     := src
+endif
+
 all:
 	@echo "Nothing to build here, you can just make install"
 
 install:
-	$(INSTALL) -m 644 -D src/MessagePack.lua            $(LIBDIR)/MessagePack.lua
+	$(INSTALL) -m 644 -D $(SRC)/MessagePack.lua         $(LIBDIR)/MessagePack.lua
 
 uninstall:
 	rm -f $(LIBDIR)/MessagePack.lua
@@ -82,7 +88,7 @@ rockspec: $(TARBALL)
 check: test
 
 test:
-	cd src && prove --exec=$(LUA) ../test/*.t
+	cd $(SRC) && prove --exec=$(LUA) ../test/*.t
 
 coverage:
 	rm -f src/luacov.stats.out src/luacov.report.out
