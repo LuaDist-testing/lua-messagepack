@@ -1,20 +1,20 @@
 -- This file was automatically generated for the LuaDist project.
 
 package = 'lua-MessagePack'
-version = '0.1.0-1'
+version = '0.2.0-1'
 -- LuaDist source
 source = {
-  tag = "0.1.0-1",
+  tag = "0.2.0-1",
   url = "git://github.com/LuaDist-testing/lua-messagepack.git"
 }
 -- Original source
 -- source = {
---     url = 'http://cloud.github.com/downloads/fperrad/lua-MessagePack/lua-messagepack-0.1.0.tar.gz',
---     md5 = '3fb1625aa2b277d7913ee090fd770d87',
---     dir = 'lua-MessagePack-0.1.0',
+--     url = 'http://cloud.github.com/downloads/fperrad/lua-MessagePack/lua-messagepack-0.2.0.tar.gz',
+--     md5 = 'bf08ae0e81c83fa512be9041a45de44e',
+--     dir = 'lua-MessagePack-0.2.0',
 -- }
 description = {
-    summary = "a pure Lua implementation of MessagePack",
+    summary = "a pure Lua implementation",
     detailed = [[
         MessagePack is an efficient binary serialization format.
 

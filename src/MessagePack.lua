@@ -184,7 +184,7 @@ packers['unsigned'] = function (buffer, n)
         end
     else
         if n >= -0x20 then
-            buffer[#buffer+1] = char(0xE0 + 0x20 + n)   -- fixnum_neg
+            buffer[#buffer+1] = char(0x100 + n) -- fixnum_neg
         elseif n >= -0x80 then
             buffer[#buffer+1] = char(0xD0,      -- int8
                                      0x100 + n)
@@ -210,7 +210,7 @@ packers['unsigned'] = function (buffer, n)
                                      floor(n / 0x10000) % 0x100,
                                      floor(n / 0x100) % 0x100,
                                      n % 0x100)
-      end
+        end
     end
 end
 
@@ -267,7 +267,7 @@ packers['signed'] = function (buffer, n)
                                      floor(n / 0x10000) % 0x100,
                                      floor(n / 0x100) % 0x100,
                                      n % 0x100)
-      end
+        end
     end
 end
 
@@ -418,9 +418,9 @@ m.unpackers = unpackers
 
 local function unpack_array (c, n)
     local t = {}
+    local decode = unpackers['any']
     while n > 0 do
-        local v = unpackers['any'](c)
-        t[#t+1] = v
+        t[#t+1] = decode(c)
         n = n-1
     end
     return t
@@ -428,10 +428,10 @@ end
 
 local function unpack_map (c, n)
     local t = {}
+    local decode = unpackers['any']
     while n > 0 do
-        local k = unpackers['any'](c)
-        local v = unpackers['any'](c)
-        t[k] = v
+        local k = decode(c)
+        t[k] = decode(c)
         n = n-1
     end
     return t
@@ -571,7 +571,7 @@ unpackers['uint64'] = function (c)
 end
 
 unpackers['fixnum_neg'] = function (c, val)
-    return val % 0x20 - 0x20
+    return val - 0x100
 end
 
 unpackers['int8'] = function (c)
@@ -754,12 +754,12 @@ function m.unpack (s)
     return data
 end
 
-function m.unpacker (f)
-    if type(f) == 'string' then
+function m.unpacker (src)
+    if type(src) == 'string' then
         local cursor = {
-            s = f,
+            s = src,
             i = 1,
-            j = #f,
+            j = #src,
             underflow = function (self)
                             error "missing bytes"
                         end,
@@ -769,12 +769,7 @@ function m.unpacker (f)
                 return cursor.i, unpackers['any'](cursor)
             end
         end
-    else
-        local read
-        local r = pcall(function () read = f.read end)
-        if not r or not read then
-            argerror('unpacker', 1, "no method 'read'")
-        end
+    elseif type(src) == 'function' then
         local cursor = {
             s = '',
             i = 1,
@@ -785,11 +780,11 @@ function m.unpacker (f)
                             self.i = 1
                             self.j = 0
                             while e > self.j do
-                                local readen = f:read(4096)
-                                if not readen then
+                                local chunk = src()
+                                if not chunk then
                                     error "missing bytes"
                                 end
-                                self.s = self.s .. readen
+                                self.s = self.s .. chunk
                                 self.j = #self.s
                             end
                         end,
@@ -802,6 +797,8 @@ function m.unpacker (f)
                 return true, unpackers['any'](cursor)
             end
         end
+    else
+        argerror('unpacker', 1, "string or function expected, got " .. type(src))
     end
 end
 
@@ -814,7 +811,7 @@ else
     set_number'double'
 end
 
-m._VERSION = "0.1.0"
+m._VERSION = "0.2.0"
 m._DESCRIPTION = "lua-MessagePack : a pure Lua implementation"
 m._COPYRIGHT = "Copyright (c) 2012 Francois Perrad"
 return m

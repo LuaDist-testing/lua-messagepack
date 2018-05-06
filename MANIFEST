@@ -11,3 +11,5 @@ src/MessagePack.lua
 test/00-require.t
 test/01-spectest.t
 test/02-except.t
+test/03-edge.t
+test/04-cover.t
